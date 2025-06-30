@@ -1,0 +1,431 @@
+﻿@page "/"
+
+<PageTitle>Chart AI Assistant</PageTitle>
+
+<div class="main-container">
+    <SfSidebar @ref="sidebarObj" ID="Sidebar" Type=SidebarType.Push Width="280px" @bind-IsOpen="SidebarToggle" Target=".maincontent" EnablePersistence="true">
+        <ChildContent>
+            <div class="sidebar-content">
+                <div class="sidebar-header">
+                    <h3>Chat History</h3>
+                    <SfButton IconCss="e-icons e-close"
+                              CssClass="close-btn-sf"
+                              OnClick="@ToggleSidebar"
+                              Title="Close">
+                    </SfButton>
+                </div>
+
+                <div class="chat-history-list">
+                    @foreach (var history in chatHistories)
+                    {
+                        <div class="history-item @(currentChatHistory?.Title == history.Title ? "active" : "")"
+                             @onclick="() => LoadChatHistory(history)">
+                            <div class="history-title">@history.Title</div>
+                            <div class="history-date">@history.ConversationCreatedDate.ToString("MMM dd, yyyy")</div>
+                            <div class="history-actions">
+                                <SfButton IconCss="e-icons e-trash"
+                                          CssClass="action-btn-sf"
+                                          OnClick="@(() => DeleteChatHistory(history))">
+                                </SfButton>
+                            </div>
+                        </div>
+                    }
+                </div>
+            </div>
+        </ChildContent>
+    </SfSidebar>
+
+    <div id="head">
+        <SfAppBar>
+            <SfButton class="e-icons e-menu" OnClick="ToggleSidebar"></SfButton>
+            <AppBarSpacer></AppBarSpacer>
+            <SfButton OnClick="ClearChat">
+                <ChildContent>
+                    <span class="chat-icon">
+                        <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                            <path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z" />
+                        </svg>
+                    </span>
+                </ChildContent>
+            </SfButton>
+        </SfAppBar>
+    </div>
+
+    <div class="maincontent"><AIAssistView @ref="chatComponent" SuggestionMessages="@headerPrompts" OnMessageSent="HandleMessageSent" HeaderText="@headerText" /></div>
+</div>
+
+
+@code {
+    private SfSidebar? sidebarObj;
+    private AIAssistView? chatComponent;
+    private List<ChatMessageModel> messages = new();
+    private List<ChatHistoryModel> chatHistories = new();
+    private ChatHistoryModel? currentChatHistory;
+    public bool SidebarToggle = true;
+    private string headerText = "How can I help you today?";
+    private List<string> headerPrompts = new();
+    private static readonly Random randomizer = new Random();
+    private bool isDeleteCalled;
+    private static readonly List<string> chartResponses = new List<string>
+    {
+        "Here's the chart based on your request:",
+        "Your data visualization is ready:",
+        "Generated chart as per your input:",
+        "This chart illustrates the information you asked for:",
+        "Here’s what your data looks like in chart form:",
+        "Hope this chart helps you see the trends clearly!",
+        "Transformed your idea into a visual story:",
+        "Turning numbers into visuals—here’s your chart!"
+    };
+
+
+    protected override async Task OnInitializedAsync()
+    {
+        await LoadChatHistories();
+        InitializeHeaderPrompts();
+    }
+
+    private void InitializeHeaderPrompts()
+    {
+        headerPrompts = new List<string>
+        {
+            "Visualize profit trends over time 📊📆",
+            "Display regional sales comparison 🌍💹",
+            "Track monthly website traffic 📊🌐",
+        };
+    }
+
+    public void ToggleSidebar()
+    {
+        SidebarToggle = !SidebarToggle;
+    }
+
+    public void ClearChat()
+    {
+        StartNewChat();
+        if(chatComponent != null)
+        {
+            InitializeHeaderPrompts();
+            chatComponent.ClearAssistView(headerPrompts);
+        }
+    }
+
+    private async Task LoadChatHistories()
+    {
+        var histories = await ChatHistory.LoadChatHistoriesAsync();
+        chatHistories = histories.ToList();
+        StateHasChanged();
+    }
+
+    private async Task HandleMessageSent(ChatMessageModel userMessage)
+    {
+        messages.Add(userMessage);
+
+        StateHasChanged();
+
+        try
+        {
+            ChatMessageModel? aiResponse = null;
+            // Check if the message is requesting a chart
+            if (IsChartRequest(userMessage.Text))
+            {
+                if (aiResponse == null)
+                {
+                    string chartConfig = System.Text.Json.JsonSerializer.Serialize(AzureAI.GenerateChartFromPrompt(userMessage.Text));
+                    List<ChatMessageModel> prevMsgs = messages.Count > 1 ? messages : null;
+                    string textResponse = await AzureAI.GetResultsFromAIAsync(userMessage.Text, prevMsgs);
+                    // string textResponse = string.Empty;
+
+
+                    string cleanedJson = Regex.Replace(Regex.Unescape(textResponse
+                     .Replace("```json", "")
+                     .Replace("```", "")
+                     .Replace("{{", "{")
+                     .Replace("}}", "}")
+                     .Trim()), @"[^\u0000-\u007F]+", string.Empty).Trim();
+
+                    // Step 2: Remove non-UTF8 characters
+                    cleanedJson = Encoding.UTF8.GetString(Encoding.UTF8.GetBytes(cleanedJson));
+
+                    var options = new JsonSerializerOptions
+                    {
+                        PropertyNameCaseInsensitive = true,
+                        Converters = { new JsonStringEnumConverter(JsonNamingPolicy.CamelCase) }
+                    };
+
+
+                    aiResponse = new ChatMessageModel
+                    {
+                        Text = GetRandomChartResponse(),
+                        TimeStamp = DateTime.Now,
+                        MessageType = ChatMessageType.Chart,
+                        ChartConfig = JsonSerializer.Deserialize<ChartConfig>(cleanedJson, options)
+                    };
+                }
+            }
+            else
+            {
+                if (chatComponent == null) return;
+                chatComponent.CurrentMessage = "Give the prompt the keyword chart or any other word used in data visualization.";
+            }
+
+
+            if (aiResponse != null && messages.Count > 0 && chatComponent != null)
+            {
+                messages.Add(aiResponse);
+                await SaveCurrentChat();
+                chatComponent.CurrentMessage = System.Text.Json.JsonSerializer.Serialize(aiResponse);
+            }
+        }
+        catch (Exception ex)
+        {
+            var errorMessage = new ChatMessageModel
+            {
+                Text = $"Sorry, I encountered an error: {ex.Message}",
+                TimeStamp = DateTime.Now,
+                MessageType = ChatMessageType.Text
+            };
+            messages.Add(errorMessage);
+            if (chatComponent == null) return;
+            chatComponent.CurrentMessage = "Sorry, I encountered an error. Please try again after some time.";
+        }
+        finally
+        {
+            StateHasChanged();
+        }
+    }
+
+
+    public static string GetRandomChartResponse()
+    {
+        int index = randomizer.Next(chartResponses.Count);
+        return chartResponses[index];
+    }
+
+    private bool IsChartRequest(string text)
+    {
+        var chartKeywords = new[] {
+            "chart", "graph", "plot", "visualize", "visualization", "data",
+            "statistics", "bar", "pie", "line", "area", "column", "doughnut", "comparison", "track", "compare", "display"
+        };
+        return chartKeywords.Any(keyword => text.ToLower().Contains(keyword));
+    }
+
+    private async Task SaveCurrentChat()
+    {
+        if (messages.Any())
+        {
+            if (currentChatHistory == null)
+            {
+                currentChatHistory = new ChatHistoryModel
+                {
+                    Title = GenerateChatTitle(),
+                    ConversationCreatedDate = DateTime.Now,
+                    Messages = new System.Collections.ObjectModel.ObservableCollection<ChatMessageModel>(messages)
+                };
+                await ChatHistory.AddChatHistoryAsync(currentChatHistory);
+            }
+            else
+            {
+                currentChatHistory.Messages = new System.Collections.ObjectModel.ObservableCollection<ChatMessageModel>(messages);
+                await ChatHistory.UpdateChatHistoryAsync(currentChatHistory);
+            }
+
+            await LoadChatHistories();
+        }
+    }
+
+    private string GenerateChatTitle()
+    {
+        var firstUserMessage = messages.FirstOrDefault()?.Text;
+        if (!string.IsNullOrEmpty(firstUserMessage))
+        {
+            return firstUserMessage.Length > 50 ? firstUserMessage.Substring(0, 47) + "..." : firstUserMessage;
+        }
+        return $"Chat {DateTime.Now:MMM dd, HH:mm}";
+    }
+
+    private void StartNewChat()
+    {
+        messages.Clear();
+        currentChatHistory = null;
+        headerText = "How can I help you today?";
+        InitializeHeaderPrompts();
+        StateHasChanged();
+    }
+
+    private async Task LoadChatHistory(ChatHistoryModel history)
+    {
+        if (isDeleteCalled)
+        {
+            isDeleteCalled = false;
+            return;
+        }
+        currentChatHistory = history;
+        messages = history.Messages.ToList();
+        if (chatComponent != null)
+        {
+            await chatComponent.GenerateContent(currentChatHistory.Title);
+        }
+        StateHasChanged();
+    }
+
+    private async Task DeleteChatHistory(ChatHistoryModel history)
+    {
+        isDeleteCalled = true;
+        await ChatHistory.DeleteChatHistoryAsync(history);
+        await LoadChatHistories();
+
+        if (currentChatHistory?.Title == history.Title)
+        {
+            StartNewChat();
+        }
+    }
+}
+
+<style>
+    .maincontent {
+        height: 100% !important;
+        width: 100% !important;
+    }
+
+    .sidebar-content {
+        height: 100%;
+        display: flex;
+        flex-direction: column;
+        background: white;
+    }
+
+    .sidebar-header {
+        padding: 20px;
+        border-bottom: 1px solid #e9ecef;
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+    }
+
+        .sidebar-header h3 {
+            margin: 0;
+            font-size: 18px;
+            color: #333;
+        }
+
+    .chat-history-list {
+        flex: 1;
+        overflow-y: auto;
+        padding: 8px;
+    }
+
+    .history-item {
+        padding: 12px;
+        margin-bottom: 4px;
+        border-radius: 8px;
+        cursor: pointer;
+        transition: background-color 0.2s;
+        position: relative;
+    }
+
+        .history-item:hover {
+            background-color: #f8f9fa;
+        }
+
+        .history-item.active {
+            background-color: #e3f2fd;
+        }
+
+    .history-title {
+        font-weight: 500;
+        color: #333;
+        margin-bottom: 4px;
+        white-space: nowrap;
+        overflow: hidden;
+        text-overflow: ellipsis;
+        padding-right: 30px;
+    }
+
+    .history-date {
+        font-size: 12px;
+        color: #666;
+    }
+
+    .history-actions {
+        position: absolute;
+        top: 12px;
+        right: 12px;
+        opacity: 0;
+        transition: opacity 0.2s;
+    }
+
+    .history-item:hover .history-actions {
+        opacity: 1;
+    }
+
+    /* Syncfusion button styling */
+    .action-btn-sf.e-btn {
+        background: none !important;
+        border: none !important;
+        cursor: pointer;
+        padding: 4px !important;
+        border-radius: 4px !important;
+        color: #666 !important;
+        min-width: auto !important;
+        min-height: auto !important;
+        box-shadow: none !important;
+        width: 32px;
+        height: 32px;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+    }
+
+        .action-btn-sf.e-btn:hover {
+            background-color: #ff4444 !important;
+            color: white !important;
+            border: none !important;
+            box-shadow: none !important;
+        }
+
+        .action-btn-sf.e-btn:focus {
+            background-color: #ff4444 !important;
+            color: white !important;
+            box-shadow: none !important;
+        }
+
+        .action-btn-sf.e-btn:active {
+            background-color: #cc3333 !important;
+            color: white !important;
+        }
+
+    /* Icon styling */
+    .action-btn-sf .e-icons {
+        font-size: 14px;
+        margin: 0;
+    }
+
+    .close-btn-sf.e-btn {
+        background: none !important;
+        border: none !important;
+        cursor: pointer;
+        padding: 4px !important;
+        border-radius: 4px !important;
+        color: #666 !important;
+        min-width: auto !important;
+        min-height: auto !important;
+        box-shadow: none !important;
+        width: 32px;
+        height: 32px;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+    }
+
+        .close-btn-sf.e-btn:hover {
+            background-color: #f0f0f0 !important;
+            color: #333 !important;
+        }
+
+    .close-btn-sf .e-icons {
+        font-size: 16px;
+        margin: 0;
+    }
+</style>

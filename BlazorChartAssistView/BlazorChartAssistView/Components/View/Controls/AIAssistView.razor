@@ -1,0 +1,227 @@
+﻿<div class="control-section">
+    <div class="default-aiassistview">
+        <SfAIAssistView @ref="sfAIAssistView" ID="aiAssistView" PromptSuggestions="@SuggestionMessages" PromptRequested="@PromptRequest" ShowHeader="false" Width="100%" Height="100%">
+            <AssistViews>
+                <AssistView>
+                    <BannerTemplate>
+                        @{
+                            if (isBannerTemplate)
+                            {
+                                <div class="banner-content">
+                                    <div class="e-icons e-assistview-icon"></div>
+                                    <h3>@HeaderText</h3>
+                                    <i>To get started, provide input or choose a suggestion.</i>
+                                </div>
+                            }
+                        }
+                    </BannerTemplate>
+                    <ResponseItemTemplate>
+                        @{
+                            var message = context;
+                            if (message != null)
+                            {
+                                <div class="response-item">
+                                    @if (IsChartMessage(message))
+                                    {
+                                        var chartConfig = GetChartConfig(message);
+                                        if (chartConfig != null)
+                                        {
+                                            <div class="chart-response">
+                                                <div class="chart-text">@GetDisplayText(message)</div>
+                                                @if (chartConfig.ChartType == ChartTypeEnum.Cartesian)
+                                                {
+                                                    <CartesianChart ChartConfig="@chartConfig" />
+                                                }
+                                                else if (chartConfig.ChartType == ChartTypeEnum.Circular)
+                                                {
+                                                    <CircularChart ChartConfig="@chartConfig" />
+                                                }
+                                            </div>
+                                        }
+                                        else
+                                        {
+                                            <div class="text-response">
+                                                @((MarkupString)FormatMessage(message.Response))
+                                            </div>
+                                        }
+                                    }
+                                    else
+                                    {
+                                        <div class="text-response">
+                                            @((MarkupString)FormatMessage(message.Response))
+                                        </div>
+                                    }
+                                </div>
+                            }
+                        }
+                    </ResponseItemTemplate>
+                </AssistView>
+            </AssistViews>
+        </SfAIAssistView>
+    </div>
+</div>
+
+@code {
+    [Parameter] public string HeaderText { get; set; }
+    [Parameter] public List<string> SuggestionMessages { get; set; } = new();
+    [Parameter] public EventCallback<ChatMessageModel> OnMessageSent { get; set; }
+
+    private SfAIAssistView? sfAIAssistView;
+    internal string CurrentMessage = string.Empty;
+    private bool isBannerTemplate { get; set; } = true;
+
+    private async Task PromptRequest(AssistViewPromptRequestedEventArgs args)
+    {
+        isBannerTemplate = false;
+        StateHasChanged();
+        await Task.Delay(1000);
+        await OnMessageSend(args);
+        args.Response = CurrentMessage;
+        args.PromptSuggestions.Clear();
+    }
+
+    internal async Task GenerateContent(string prompt)
+    {
+        if (sfAIAssistView != null)
+        {
+            await sfAIAssistView.ExecutePromptAsync(prompt);
+        }
+    }
+
+    internal void ClearAssistView(List<string> prompts)
+    {
+        if (sfAIAssistView != null)
+        {
+            sfAIAssistView.Prompts.Clear();
+            SuggestionMessages = prompts;
+            isBannerTemplate = true;
+            InvokeAsync(StateHasChanged);
+        }
+    }
+
+    private string PrepareMessageContent(ChatMessageModel message)
+    {
+        if (message.MessageType == ChatMessageType.Chart && message.ChartConfig != null)
+        {
+            return $"CHART:{System.Text.Json.JsonSerializer.Serialize(message.ChartConfig)}:{message.Text}";
+        }
+
+        return message.Text;
+    }
+
+    private async Task OnMessageSend(AssistViewPromptRequestedEventArgs args)
+    {
+        var message = new ChatMessageModel
+        {
+            Text = args.Prompt,
+            TimeStamp = DateTime.Now,
+            MessageType = ChatMessageType.Text
+        };
+
+        await OnMessageSent.InvokeAsync(message);
+        StateHasChanged();
+    }
+
+    private bool IsChartMessage(ResponseItemTemplateContext message)
+    {
+        return message.Response.Contains("CHART", StringComparison.InvariantCultureIgnoreCase);
+    }
+
+    private ChartConfig? GetChartConfig(ResponseItemTemplateContext message)
+    {
+        if (!IsChartMessage(message)) return null;
+
+        try
+        {
+            ChatMessageModel model = System.Text.Json.JsonSerializer.Deserialize<ChatMessageModel>(message.Response);
+
+            return model?.ChartConfig ?? null;
+
+        }
+        catch { }
+
+        return null;
+    }
+
+    private string GetDisplayText(ResponseItemTemplateContext message)
+    {
+        try
+        {
+            ChatMessageModel model = System.Text.Json.JsonSerializer.Deserialize<ChatMessageModel>(message.Response);
+
+            return model?.Text ?? null;
+        }
+        catch
+        {
+            return message.Response;
+        }
+    }
+
+    private string FormatMessage(string message)
+    {
+        if (string.IsNullOrEmpty(message))
+            return string.Empty;
+
+        // Handle special message types
+        if (message.Contains("CHART", StringComparison.InvariantCultureIgnoreCase))
+        {
+            return GetDisplayText(new ResponseItemTemplateContext { Response = message });
+        }
+
+        // Convert markdown-style formatting to HTML
+        message = System.Text.RegularExpressions.Regex.Replace(message, @"\*\*(.*?)\*\*", "<strong>$1</strong>");
+        message = System.Text.RegularExpressions.Regex.Replace(message, @"\*(.*?)\*", "<em>$1</em>");
+        message = System.Text.RegularExpressions.Regex.Replace(message, @"`(.*?)`", "<code>$1</code>");
+        message = message.Replace("\n", "<br>");
+
+        return message;
+    }
+}
+
+<style>
+    .default-aiassistview {
+        height: 100%;
+        width: 100%;
+        margin: 0 auto;
+    }
+
+        .default-aiassistview .banner-content .e-assistview-icon:before {
+            font-size: 35px;
+        }
+
+        .default-aiassistview .banner-content {
+            display: flex;
+            flex-direction: column;
+            justify-content: center;
+            height: 330px;
+            text-align: center;
+        }
+
+    @@media only screen and (max-width: 750px) {
+        .default-aiassistview {
+            width: 100%;
+        }
+    }
+
+    .responseItemContent {
+        display: flex;
+        flex-direction: column;
+        gap: 10px;
+        margin-left: 20px
+    }
+
+        .responseItemContent .response-header {
+            font-size: 20px;
+            font-weight: bold;
+            display: flex;
+            align-items: center;
+        }
+
+        .responseItemContent .responseContent {
+            margin-left: 35px;
+        }
+
+        .responseItemContent .response-header .e-assistview-icon:before {
+            margin-right: 10px;
+        }
+</style>

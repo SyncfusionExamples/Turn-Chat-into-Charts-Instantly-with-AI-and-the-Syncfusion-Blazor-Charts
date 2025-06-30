@@ -1,0 +1,80 @@
+﻿<div class="chart-container">
+    @if (ChartConfig != null)
+    {
+        <SfAccumulationChart Title="@ChartConfig.Title" Theme="@Theme.Bootstrap">
+            
+            <AccumulationChartLegendSettings Visible="@ChartConfig.ShowLegend" 
+                                           Position="LegendPosition.Right"
+                                           ToggleVisibility="true">
+            </AccumulationChartLegendSettings>
+
+            <AccumulationChartSeriesCollection>
+                @foreach (var series in ChartConfig.Series)
+                {
+                    @if (series.Type == SeriesType.Pie)
+                    {
+                        <AccumulationChartSeries DataSource="@series.DataSource" 
+                                               Name="@series.Name"
+                                               XName="@series.XBindingPath" 
+                                               YName="@series.YBindingPath" 
+                                               Type="AccumulationType.Pie"
+                                               Radius="80%"
+                                               StartAngle="0"
+                                               EndAngle="360"
+                                               Explode="false"
+                                               ExplodeOffset="10%"
+                                               EnableTooltip="@series.EnableTooltip">
+                            <AccumulationChartAnimation Enable="true"></AccumulationChartAnimation>
+                            <AccumulationDataLabelSettings Visible="true" 
+                                                         Name="XValue" 
+                                                         Position="AccumulationLabelPosition.Outside">
+                                <AccumulationChartConnector Type="ConnectorType.Line" Length="30px"></AccumulationChartConnector>
+                            </AccumulationDataLabelSettings>
+                        </AccumulationChartSeries>
+                    }
+                    else if (series.Type == SeriesType.Doughnut)
+                    {
+                        <AccumulationChartSeries DataSource="@series.DataSource" 
+                                               Name="@series.Name"
+                                               XName="@series.XBindingPath" 
+                                               YName="@series.YBindingPath" 
+                                               Type="AccumulationType.Pie"
+                                               Radius="80%"
+                                               InnerRadius="40%"
+                                               StartAngle="0"
+                                               EndAngle="360"
+                                               Explode="false"
+                                               ExplodeOffset="10%"
+                                               EnableTooltip="@series.EnableTooltip">
+                            <AccumulationChartAnimation Enable="true"></AccumulationChartAnimation>
+                            <AccumulationDataLabelSettings Visible="true" 
+                                                         Name="XValue" 
+                                                         Position="AccumulationLabelPosition.Outside">
+                                <AccumulationChartConnector Type="ConnectorType.Line" Length="30px"></AccumulationChartConnector>
+                            </AccumulationDataLabelSettings>
+                        </AccumulationChartSeries>
+                    }
+                }
+            </AccumulationChartSeriesCollection>
+
+            <AccumulationChartTooltipSettings Enable="true" Format="${point.x} : ${point.y}%">
+            </AccumulationChartTooltipSettings>
+        </SfAccumulationChart>
+    }
+</div>
+
+@code {
+    [Parameter] public ChartConfig? ChartConfig { get; set; }
+}
+
+<style>
+    .chart-container {
+        width: 100%;
+        height: 400px;
+        background: white;
+        border-radius: 8px;
+        padding: 16px;
+        box-shadow: 0 2px 8px rgba(0,0,0,0.1);
+        margin: 8px 0;
+    }
+</style>

@@ -1,0 +1,159 @@
+﻿@using Syncfusion.Blazor.Charts
+@using BlazorChartAssistView.Models
+
+<div class="chart-container">
+    @if (ChartConfig != null)
+    {
+        <SfChart Title="@ChartConfig.Title" 
+                 EnableSideBySidePlacement="@ChartConfig.SideBySidePlacement"
+                 Theme="@Theme.Bootstrap">
+            
+            <ChartArea><ChartAreaBorder Width="0"></ChartAreaBorder></ChartArea>
+
+            <ChartPrimaryXAxis Title="@GetXAxisTitle()" 
+                              ValueType="@GetXAxisType()"
+                              LabelRotation="@GetXAxisRotation()">
+                <ChartAxisMajorGridLines Width="0"></ChartAxisMajorGridLines>
+                <ChartAxisLineStyle Width="0"></ChartAxisLineStyle>
+                <ChartAxisMajorTickLines Width="0"></ChartAxisMajorTickLines>
+            </ChartPrimaryXAxis>
+
+            <ChartPrimaryYAxis Title="@GetYAxisTitle()" ValueType="@GetYAxisType()">
+                <ChartAxisLineStyle Width="0"></ChartAxisLineStyle>
+                <ChartAxisMajorTickLines Width="0"></ChartAxisMajorTickLines>
+            </ChartPrimaryYAxis>
+
+            <ChartLegendSettings Visible="@ChartConfig.ShowLegend" 
+                               Position="LegendPosition.Bottom"
+                               ToggleVisibility="true">
+            </ChartLegendSettings>
+
+            <ChartSeriesCollection>
+                @foreach (var series in ChartConfig.Series)
+                {
+                    @if (series.Type == SeriesType.Column)
+                    {
+                        <ChartSeries DataSource="@series.DataSource" 
+                                   Name="@series.Name"
+                                   XName="@series.XBindingPath" 
+                                   YName="@series.YBindingPath" 
+                                   Type="ChartSeriesType.Column"
+                                   Fill="@GetSeriesColor(series)"
+                                   EnableTooltip="@series.EnableTooltip">
+                            <ChartSeriesAnimation Enable="true"></ChartSeriesAnimation>
+                            <ChartCornerRadius TopLeft="4" TopRight="4"></ChartCornerRadius>
+                        </ChartSeries>
+                    }
+                    else if (series.Type == SeriesType.Line)
+                    {
+                        <ChartSeries DataSource="@series.DataSource" 
+                                   Name="@series.Name"
+                                   XName="@series.XBindingPath" 
+                                   YName="@series.YBindingPath" 
+                                   Type="ChartSeriesType.Line"
+                                   Fill="@GetSeriesColor(series)"
+                                   Width="3"
+                                   EnableTooltip="@series.EnableTooltip">
+                            <ChartSeriesAnimation Enable="true"></ChartSeriesAnimation>
+                            <ChartMarker Visible="true" Height="7" Width="7">
+                                <ChartMarkerBorder Width="2" Color="@GetSeriesColor(series)"></ChartMarkerBorder>
+                            </ChartMarker>
+                        </ChartSeries>
+                    }
+                    else if (series.Type == SeriesType.Area)
+                    {
+                        <ChartSeries DataSource="@series.DataSource" 
+                                   Name="@series.Name"
+                                   XName="@series.XBindingPath" 
+                                   YName="@series.YBindingPath" 
+                                   Type="ChartSeriesType.Area"
+                                   Fill="@GetSeriesColor(series)"
+                                   Opacity="0.7"
+                                   EnableTooltip="@series.EnableTooltip">
+                            <ChartSeriesAnimation Enable="true"></ChartSeriesAnimation>
+                        </ChartSeries>
+                    }
+                    else if (series.Type == SeriesType.Spline)
+                    {
+                        <ChartSeries DataSource="@series.DataSource" 
+                                   Name="@series.Name"
+                                   XName="@series.XBindingPath" 
+                                   YName="@series.YBindingPath" 
+                                   Type="ChartSeriesType.Spline"
+                                   Fill="@GetSeriesColor(series)"
+                                     Width="3" EnableTooltip="@series.EnableTooltip">
+                            <ChartSeriesAnimation Enable="true"></ChartSeriesAnimation>
+                            <ChartMarker Visible="true" Height="7" Width="7">
+                                <ChartMarkerBorder Width="2" Color="@GetSeriesColor(series)"></ChartMarkerBorder>
+                            </ChartMarker>
+                        </ChartSeries>
+                    }
+                }
+            </ChartSeriesCollection>
+
+            <ChartTooltipSettings Enable="true" Format="${point.x} : ${point.y}" EnableMarker="true">
+            </ChartTooltipSettings>
+        </SfChart>
+    }
+</div>
+
+@code {
+    [Parameter] public ChartConfig? ChartConfig { get; set; }
+
+    private readonly string[] _colors = new[]
+    {
+        "#1089E9", "#08CDAA", "#F58400", "#9656FF", "#F9C200", 
+        "#F954A3", "#05BB3D", "#06B1E2", "#FF4E4E"
+    };
+
+    private string GetXAxisTitle() => ChartConfig?.XAxis.FirstOrDefault()?.Title ?? "X Axis";
+    private string GetYAxisTitle() => ChartConfig?.YAxis.FirstOrDefault()?.Title ?? "Y Axis";
+
+    private Syncfusion.Blazor.Charts.ValueType GetXAxisType()
+    {
+        var axisType = ChartConfig?.XAxis.FirstOrDefault()?.Type ?? AxisType.Category;
+        return axisType switch
+        {
+            AxisType.Category => Syncfusion.Blazor.Charts.ValueType.Category,
+            AxisType.Numerical => Syncfusion.Blazor.Charts.ValueType.Double,
+            AxisType.DateTime => Syncfusion.Blazor.Charts.ValueType.DateTime,
+            AxisType.Logarithmic => Syncfusion.Blazor.Charts.ValueType.Logarithmic,
+            _ => Syncfusion.Blazor.Charts.ValueType.Category
+        };
+    }
+
+    private Syncfusion.Blazor.Charts.ValueType GetYAxisType()
+    {
+        var axisType = ChartConfig?.YAxis.FirstOrDefault()?.Type ?? AxisType.Numerical;
+        return axisType switch
+        {
+            AxisType.Numerical => Syncfusion.Blazor.Charts.ValueType.Double,
+            AxisType.DateTime => Syncfusion.Blazor.Charts.ValueType.DateTime,
+            AxisType.Logarithmic => Syncfusion.Blazor.Charts.ValueType.Logarithmic,
+            _ => Syncfusion.Blazor.Charts.ValueType.Double
+        };
+    }
+
+    private double GetXAxisRotation() => ChartConfig?.XAxis.FirstOrDefault()?.LabelRotation ?? 0;
+
+    private string GetSeriesColor(SeriesConfig series)
+    {
+        if (!string.IsNullOrEmpty(series.Fill))
+            return series.Fill;
+
+        var index = ChartConfig?.Series.ToList().IndexOf(series) ?? 0;
+        return _colors[index % _colors.Length];
+    }
+}
+
+<style>
+    .chart-container {
+        width: 100%;
+        height: 400px;
+        background: white;
+        border-radius: 8px;
+        padding: 16px;
+        box-shadow: 0 2px 8px rgba(0,0,0,0.1);
+        margin: 8px 0;
+    }
+</style>
