@@ -1,0 +1,29 @@
+﻿@using System.Net.Http
+@using System.Net.Http.Json
+@using Microsoft.AspNetCore.Components.Forms
+@using Microsoft.AspNetCore.Components.Routing
+@using Microsoft.AspNetCore.Components.Web
+@using static Microsoft.AspNetCore.Components.Web.RenderMode
+@using Microsoft.AspNetCore.Components.Web.Virtualization
+@using Microsoft.JSInterop
+@using BlazorChartAssistView
+@using BlazorChartAssistView.Components
+@using BlazorChartAssistView.Models
+@using BlazorChartAssistView.Services
+@using BlazorChartAssistView.Utils
+@using BlazorChartAssistView.Components.View.Charts
+@using BlazorChartAssistView.Components.View.Controls
+@using Syncfusion.Blazor
+@using Syncfusion.Blazor.InteractiveChat
+@using Syncfusion.Blazor.Charts
+@using Syncfusion.Blazor.Navigations
+@using Syncfusion.Blazor.Buttons
+@using Syncfusion.Blazor.Inputs
+@using System.Text
+@using System.Text.Json
+@using System.Text.Json.Serialization
+@using System.Text.RegularExpressions
+@inject AzureAIService AzureAI
+@inject ChatHistoryService ChatHistory
+@inject IJSRuntime JSRuntime
+
