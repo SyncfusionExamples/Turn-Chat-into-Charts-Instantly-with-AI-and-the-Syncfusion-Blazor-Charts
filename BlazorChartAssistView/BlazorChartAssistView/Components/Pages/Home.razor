@@ -166,7 +166,7 @@
             else
             {
                 if (chatComponent == null) return;
-                chatComponent.CurrentMessage = "Give the prompt the keyword chart or any other word used in data visualization.";
+                chatComponent.CurrentMessage = "Include the keyword 'chart' or any other term commonly associated with data visualization in the prompt.";
             }
 
 
@@ -181,13 +181,13 @@
         {
             var errorMessage = new ChatMessageModel
             {
-                Text = $"Sorry, I encountered an error: {ex.Message}",
+                Text = $"Apologies, an error occurred while processing your request: {ex.Message}",
                 TimeStamp = DateTime.Now,
                 MessageType = ChatMessageType.Text
             };
             messages.Add(errorMessage);
             if (chatComponent == null) return;
-            chatComponent.CurrentMessage = "Sorry, I encountered an error. Please try again after some time.";
+            chatComponent.CurrentMessage = "Apologies, an error occurred while processing your request. Please try again later or check your API configuration and usage limits.";
         }
         finally
         {
